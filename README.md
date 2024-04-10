@@ -12,3 +12,4 @@ format suitable for the machine learning model. Text Tokenization and Padding: W
 using a tokenizer and pad sequences to a fixed length for model training. Model Training: We'll define and train a Long Short-Term 
 Memory (LSTM) neural network model to classify the sentiment of tweets. Model Evaluation: We'll evaluate the model's performance on 
 unseen data using metrics like accuracy.
+Data available at: https://www.kaggle.com/datasets/kazanova/sentiment140/code
