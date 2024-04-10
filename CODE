@@ -1,0 +1,154 @@
+#code#
+#########
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense
+from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.metrics import accuracy_score
+import re
+import matplotlib.pyplot as plt
+import seaborn as sns
+from wordcloud import WordCloud
+
+# Load the Twitter data
+twitter_data = pd.read_csv('TWEETS.csv')
+
+# Display the first few rows of the dataset
+print("First few rows of the dataset:")
+print(twitter_data.head())
+
+
+# Summary statistics
+print("\nSummary statistics:")
+print(twitter_data.describe())
+
+# Check for missing values
+print("\nMissing values:")
+print(twitter_data.isnull().sum())
+
+
+# Distribution of sentiment classes
+plt.figure(figsize=(10, 6))
+sns.countplot(x='airline_sentiment', data=twitter_data)
+plt.title("Distribution of Sentiment Classes")
+plt.xlabel("Sentiment")
+plt.ylabel("Count")
+plt.show()
+
+# Word cloud for positive sentiment
+positive_tweets = twitter_data[twitter_data['airline_sentiment'] == 'positive']['text']
+positive_text = ' '.join(positive_tweets)
+
+wordcloud = WordCloud(width=800, height=400, background_color='white').generate(positive_text)
+
+plt.figure(figsize=(10, 6))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.title("Word Cloud for Positive Sentiment")
+plt.axis('off')
+plt.show()
+
+# Word cloud for negative sentiment
+negative_tweets = twitter_data[twitter_data['airline_sentiment'] == 'negative']['text']
+negative_text = ' '.join(negative_tweets)
+
+wordcloud = WordCloud(width=800, height=400, background_color='white').generate(negative_text)
+
+plt.figure(figsize=(10, 6))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.title("Word Cloud for Negative Sentiment")
+plt.axis('off')
+plt.show()
+
+# Distribution of tweet lengths
+twitter_data['tweet_length'] = twitter_data['text'].apply(lambda x: len(x.split()))
+
+plt.figure(figsize=(10, 6))
+sns.histplot(twitter_data['tweet_length'], bins=30, kde=True)
+plt.title("Distribution of Tweet Lengths")
+plt.xlabel("Tweet Length")
+plt.ylabel("Count")
+plt.show()
+
+# Average tweet length by sentiment
+avg_tweet_length = twitter_data.groupby('airline_sentiment')['tweet_length'].mean()
+
+plt.figure(figsize=(10, 6))
+sns.barplot(x=avg_tweet_length.index, y=avg_tweet_length.values)
+plt.title("Average Tweet Length by Sentiment")
+plt.xlabel("Sentiment")
+plt.ylabel("Average Tweet Length")
+plt.show()
+
+# Load the Sentiment140 dataset (optional)
+# This step is for demonstration purposes and might not be necessary for your data
+columns = ['sentiment', 'id', 'date', 'query', 'user', 'text']
+sentiment140_data = pd.read_csv(file_path, names=columns, encoding='latin-1')
+
+
+# Keep only the sentiment and text columns (assuming your data has these columns)
+twitter_data = sentiment140_data[['sentiment', 'text']]
+
+# Preprocess
+# Handle missing values
+twitter_data['text'] = twitter_data['text'].fillna('')
+
+# Handle irrelevant characters and links
+def preprocess_text(text):
+  # Convert NaNs to empty strings
+  if pd.isnull(text):
+    text = ''
+  # Remove links, mentions, and special characters
+  text = text.replace('&amp;', '&') # Convert HTML encoding
+  text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", text).split())
+  return text
+
+twitter_data['clean_text'] = twitter_data['text'].apply(preprocess_text)
+
+# Tokenization
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(twitter_data['clean_text'])
+
+X = tokenizer.texts_to_sequences(twitter_data['clean_text'])
+X = pad_sequences(X, maxlen=100, padding='post')
+
+# Label encoding (assuming sentiment is a string with classes)
+y = twitter_data['sentiment'].map({'0': 0, '4': 1})
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+
+# Define the model
+model = Sequential([
+  Embedding(input_dim=len(tokenizer.word_index)+1, output_dim=100, input_length=100),
+  LSTM(64, dropout=0.2, recurrent_dropout=0.2),
+  Dense(1, activation='sigmoid')
+])
+
+# Compile the model
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# Early stopping callback
+early_stopping = EarlyStopping(monitor='val_loss', patience=3)
+
+# Train the model
+history = model.fit(X_train, y_train, epochs=10, batch_size=32, validation_split=0.1, callbacks=[early_stopping])
+
+# Evaluate the model on the test set
+accuracy = model.evaluate(X_test, y_test)
+print("Test Accuracy:", accuracy)
+# Plot the training and validation accuracy
+
+plt.figure(figsize=(10, 6))
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Training and Validation Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+
